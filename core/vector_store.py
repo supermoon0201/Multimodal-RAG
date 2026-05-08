@@ -84,48 +84,6 @@ class VectorStore:
         )
         return [row["vector"] for row in rows]
 
-    def _fetch_colqwen2_doc_pages(self, doc_name: str) -> dict[int, list[list[float]]]:
-        safe_doc_name = _escape_filter_value(doc_name)
-        filter_expr = f'doc_name == "{safe_doc_name}"'
-        pages: dict[int, list[list[float]]] = {}
-
-        query_iterator = getattr(self.client, "query_iterator", None)
-        if callable(query_iterator):
-            iterator = None
-            try:
-                iterator = query_iterator(
-                    settings.collection_name,
-                    filter=filter_expr,
-                    output_fields=["page_idx", "vector"],
-                    batch_size=1000,
-                )
-                while True:
-                    rows = iterator.next()
-                    if not rows:
-                        break
-                    for row in rows:
-                        pages.setdefault(int(row["page_idx"]), []).append(row["vector"])
-                return pages
-            except (AttributeError, TypeError):
-                logger.debug("Milvus query_iterator is unavailable; falling back to bounded query", exc_info=True)
-                pages.clear()
-            finally:
-                close = getattr(iterator, "close", None)
-                if callable(close):
-                    close()
-
-        rows = self._run_search_with_reconnect(
-            lambda: self.client.query(
-                settings.collection_name,
-                filter=filter_expr,
-                output_fields=["page_idx", "vector"],
-                limit=16384,
-            )
-        )
-        for row in rows:
-            pages.setdefault(int(row["page_idx"]), []).append(row["vector"])
-        return pages
-
     def _rerank_colqwen2_pages(
         self,
         query_vectors: list[list[float]],
@@ -148,24 +106,6 @@ class VectorStore:
             reranked.append({
                 "doc_name": candidate["doc_name"],
                 "page_idx": candidate["page_idx"],
-                "score": float(scores.max(axis=1).sum()),
-            })
-
-        reranked.sort(key=lambda item: item["score"], reverse=True)
-        return reranked[:top_k]
-
-    def _rerank_colqwen2_doc(self, query_vectors: list[list[float]], doc_name: str, top_k: int) -> list[dict]:
-        query_arr = np.asarray(query_vectors, dtype=np.float32)
-        pages = self._fetch_colqwen2_doc_pages(doc_name)
-        logger.info("[ColQwen2] Exact reranking %d indexed pages for doc=%s", len(pages), doc_name)
-        reranked = []
-
-        for page_idx, page_vectors in pages.items():
-            page_arr = np.asarray(page_vectors, dtype=np.float32)
-            scores = query_arr @ page_arr.T
-            reranked.append({
-                "doc_name": doc_name,
-                "page_idx": page_idx,
                 "score": float(scores.max(axis=1).sum()),
             })
 
@@ -254,9 +194,6 @@ class VectorStore:
             search_params["params"] = {"nprobe": min(settings.ivf_nprobe, settings.ivf_nlist)}
 
         if settings.embed_provider == "colqwen2":
-            if doc_name:
-                return self._rerank_colqwen2_doc(query_vector, doc_name, top_k)
-
             page_query_scores: dict[tuple[str, int], dict[int, float]] = {}
 
             hits_per_query = self._run_search_with_reconnect(
