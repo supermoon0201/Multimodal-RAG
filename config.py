@@ -105,3 +105,8 @@ class Settings:
 
 
 settings = Settings()
+
+if "://" not in settings.milvus_uri:
+    # Pymilvus reads MILVUS_URI at import time and only accepts remote URLs there.
+    # Keep the app setting, but do not expose local Milvus Lite paths globally.
+    os.environ.pop("MILVUS_URI", None)
