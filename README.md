@@ -314,7 +314,7 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
 pip install -r requirements.txt
 ```
 
-基础模式依赖包括 cohere、dashscope、`pymilvus[milvus_lite]`、openai、PyMuPDF、pillow、flask、numpy、python-dotenv 和 `setuptools<82`；其中 Milvus Lite 用于默认的本地文件数据库 `./data/milvus.db`。若启用本地 ColQwen2，再额外安装 `torch` 和 `colpali-engine`。
+基础模式依赖包括 cohere、dashscope、`pymilvus[milvus_lite]`、openai、PyMuPDF、pillow、flask、numpy、python-dotenv 和 `setuptools<82`；其中 Milvus Lite 用于默认的本地文件数据库 `./data/milvus.db`。若启用本地 ColQwen2，`requirements.txt` 已包含兼容的 `torch`、`transformers` 和 `colpali-engine` 版本约束。
 
 ### 3. 获取 API Key
 
@@ -398,7 +398,7 @@ python app.py
 1. 安装额外依赖
 
 ```bash
-pip install torch colpali-engine
+pip install -U -r requirements.txt
 ```
 
 2. 准备本地模型目录
@@ -512,10 +512,10 @@ pip install -r requirements.txt
 先安装 ColQwen2 依赖：
 
 ```bash
-pip install torch colpali-engine
+pip install -U -r requirements.txt
 ```
 
-然后确认 `.env` 里的 `EMBED_PROVIDER=colqwen2` 和 `COLQWEN2_MODEL_PATH` 指向本地模型目录。
+然后确认 `.env` 里的 `EMBED_PROVIDER=colqwen2` 和 `COLQWEN2_MODEL_PATH` 指向本地模型目录。如果报错包含 `PyTorch >= 2.4 is required`、`NumPy 2.x` 或 `name 'nn' is not defined`，通常是旧版 torch 与新版 transformers / NumPy 混装导致，执行上面的安装命令后重启 Flask 进程。
 
 ### Q: ColQwen2 模型加载失败
 

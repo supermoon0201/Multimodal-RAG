@@ -10,5 +10,5 @@ numpy>=1.24.0
 python-dotenv>=1.0.0
 
 # Optional: local ColQwen2 embedding
-colpali-engine>=0.3.0
-torch>=2.2.0
+colpali-engine>=0.3.15,<0.4.0
+torch>=2.4.0,<2.11.0

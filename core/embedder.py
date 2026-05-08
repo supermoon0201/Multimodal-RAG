@@ -2,6 +2,7 @@ import io
 import base64
 import logging
 import time
+import re
 from PIL import Image
 from config import settings
 from utils.image_utils import pil_to_base64
@@ -158,12 +159,22 @@ class ColQwen2Embedder(BaseEmbedder):
     def __init__(self):
         try:
             import torch
-            from colpali_engine.models import ColQwen2, ColQwen2Processor
-            from transformers.utils.import_utils import is_flash_attn_2_available
         except ImportError as exc:
             raise RuntimeError(
+                "ColQwen2 requires PyTorch. Install compatible dependencies with "
+                "`pip install -U -r requirements.txt`."
+            ) from exc
+
+        self._validate_torch_version(torch)
+
+        try:
+            from colpali_engine.models import ColQwen2, ColQwen2Processor
+            from transformers.utils.import_utils import is_flash_attn_2_available
+        except Exception as exc:
+            raise RuntimeError(
                 "ColQwen2 requires `torch`, `colpali-engine`, and `transformers`. "
-                "Install the extra dependencies and set EMBED_PROVIDER=colqwen2."
+                "Install compatible versions with `pip install -U -r requirements.txt`. "
+                "If you recently upgraded dependencies, restart the Flask process."
             ) from exc
 
         self.torch = torch
@@ -183,6 +194,19 @@ class ColQwen2Embedder(BaseEmbedder):
         ).to(self.device).eval()
         self.processor = ColQwen2Processor.from_pretrained(settings.embed_model)
         logger.info("[ColQwen2] Ready (dim=%s)", getattr(self.model, "dim", settings.embed_dim))
+
+    @staticmethod
+    def _validate_torch_version(torch_module):
+        version_match = re.match(r"^(\d+)\.(\d+)", torch_module.__version__)
+        if not version_match:
+            return
+
+        major, minor = (int(part) for part in version_match.groups())
+        if (major, minor) < (2, 4):
+            raise RuntimeError(
+                f"ColQwen2 requires torch>=2.4.0, but found torch {torch_module.__version__}. "
+                "Run `pip install -U -r requirements.txt`, then restart the Flask process."
+            )
 
     @staticmethod
     def _resolve_device(torch_module):
