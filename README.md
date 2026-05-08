@@ -43,7 +43,7 @@ AI 直接"看图"回答问题
 - 无需本地 GPU，无需安装 PyTorch 或 poppler
 - 所有 AI 计算通过云端 API 完成（Embedding + LLM 均支持 DashScope 和 OpenRouter）
 - Embedding 和 LLM 引擎均可独立切换，国内用户推荐全部使用 DashScope（无需代理）
-- 安装依赖只需几秒钟，9 个轻量 Python 包
+- 基础云端模式依赖轻量，默认本地 Milvus Lite 无需单独启动数据库服务
 - 面对扫描件 PDF、图文混排文档、含公式与表格的专业资料，都能完整保留所有视觉信息
 
 ## 技术栈
@@ -70,7 +70,7 @@ D:/PDF-AI/
 ├── .env                    # 密钥和连接配置（不入库）
 ├── .env.example            # 配置模板
 ├── .gitignore
-├── requirements.txt        # Python 依赖（9 个包，无 PyTorch）
+├── requirements.txt        # Python 依赖（含默认 Milvus Lite 和可选本地 ColQwen2 依赖）
 ├── config.py               # 配置中心，从 .env 加载
 ├── app.py                  # Flask Web 服务 + API 路由（端口 7860）
 ├── api_server.py           # 独立 API 问答服务（端口 7861，供外部调用）
@@ -314,7 +314,7 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
 pip install -r requirements.txt
 ```
 
-基础模式共 9 个轻量包（cohere、dashscope、pymilvus、openai、PyMuPDF、pillow、flask、numpy、python-dotenv），安装通常在 1 分钟内完成。若启用本地 ColQwen2，再额外安装 `torch` 和 `colpali-engine`。
+基础模式依赖包括 cohere、dashscope、`pymilvus[milvus_lite]`、openai、PyMuPDF、pillow、flask、numpy、python-dotenv 和 setuptools；其中 Milvus Lite 用于默认的本地文件数据库 `./data/milvus.db`。若启用本地 ColQwen2，再额外安装 `torch` 和 `colpali-engine`。
 
 ### 3. 获取 API Key
 
@@ -529,7 +529,13 @@ pip install torch colpali-engine
 
 ### Q: Milvus 连接失败
 
-检查 `.env` 中的 `MILVUS_URI`。如果使用本地 Milvus Lite，确认 `./data/` 目录可写；如果连接本地/自建 Milvus Server，确认服务已启动且地址正确。
+检查 `.env` 中的 `MILVUS_URI`。如果使用本地 Milvus Lite，确认已通过 `pip install -r requirements.txt` 安装 `pymilvus[milvus_lite]` 和 `setuptools`，并确认 `./data/` 目录可写；如果连接本地/自建 Milvus Server，确认服务已启动且地址正确。
+
+如果报错包含 `No module named 'pkg_resources'`，说明当前 Python 环境缺少 setuptools，执行：
+
+```bash
+pip install -U setuptools
+```
 
 ### Q: Milvus 报错 `Insert missed a field`
 
