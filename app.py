@@ -51,7 +51,7 @@ def _get_page(doc_name: str, page_idx: int):
 
 def get_components():
     if "vector_store" not in _components:
-        logger.info("Connecting to Zilliz: %s", settings.milvus_uri)
+        logger.info("Connecting to Milvus: %s", settings.milvus_uri)
         _components["vector_store"] = VectorStore()
     if "embedder" not in _components:
         logger.info("Initializing embedder: %s (%s)", settings.embed_model, settings.embed_provider)
@@ -135,16 +135,21 @@ def encode():
         logger.info("Converted %d pages", n_pages)
 
         comps = get_components()
-        logger.info("Encoding %d pages via %s API...", n_pages, settings.embed_provider)
+        logger.info("Encoding %d pages via %s...", n_pages, settings.embed_provider)
         page_vectors = comps["embedder"].encode_images(images)
-        logger.info("Got %d vectors", len(page_vectors))
+        logger.info("Got %d embeddings", len(page_vectors))
 
         total_rows = comps["vector_store"].insert_pages(doc_name, page_vectors)
-        logger.info("Inserted %d rows into Zilliz", total_rows)
+        logger.info("Inserted %d rows into Milvus", total_rows)
+
+        if settings.embed_provider == "colqwen2":
+            message = f"{doc_name}: {n_pages} pages indexed, {total_rows} patch vectors stored."
+        else:
+            message = f"{doc_name}: {n_pages} pages indexed, {total_rows} vectors stored."
 
         return jsonify({
             "status": "ok",
-            "message": f"{doc_name}: {n_pages} pages indexed, {total_rows} vectors stored.",
+            "message": message,
         })
     except Exception as e:
         logger.error("Encode failed: %s\n%s", e, traceback.format_exc())
@@ -203,7 +208,7 @@ def search():
 
 @app.route("/api/clear", methods=["POST"])
 def clear():
-    # Clear Zilliz
+    # Clear Milvus
     try:
         comps = get_components()
         comps["vector_store"].drop_collection()

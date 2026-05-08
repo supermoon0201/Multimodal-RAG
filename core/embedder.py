@@ -53,7 +53,7 @@ class CohereEmbedder(BaseEmbedder):
         import cohere
         self.client = cohere.ClientV2(api_key=settings.cohere_api_key)
         self.image_limiter = _RateLimiter(COHERE_IMAGE_LIMIT)
-        self.text_limiter = _RateLimiter(COHREE_TEXT_LIMIT)
+        self.text_limiter = _RateLimiter(COHERE_TEXT_LIMIT)
 
     def encode_images(self, images: list[Image.Image]) -> list[list[float]]:
         batch_size = settings.cohere_batch_size
@@ -152,6 +152,92 @@ class DashScopeEmbedder(BaseEmbedder):
         return vec
 
 
+class ColQwen2Embedder(BaseEmbedder):
+    """Local ColQwen2 model for multi-vector page and query embeddings."""
+
+    def __init__(self):
+        try:
+            import torch
+            from colpali_engine.models import ColQwen2, ColQwen2Processor
+            from transformers.utils.import_utils import is_flash_attn_2_available
+        except ImportError as exc:
+            raise RuntimeError(
+                "ColQwen2 requires `torch`, `colpali-engine`, and `transformers`. "
+                "Install the extra dependencies and set EMBED_PROVIDER=colqwen2."
+            ) from exc
+
+        self.torch = torch
+        self.device = self._resolve_device(torch)
+        dtype = torch.bfloat16 if self.device.type == "cuda" else torch.float32
+        attn_implementation = (
+            "flash_attention_2"
+            if self.device.type == "cuda" and is_flash_attn_2_available()
+            else None
+        )
+
+        logger.info("[ColQwen2] Loading local model from %s on %s", settings.embed_model, self.device)
+        self.model = ColQwen2.from_pretrained(
+            settings.embed_model,
+            torch_dtype=dtype,
+            attn_implementation=attn_implementation,
+        ).to(self.device).eval()
+        self.processor = ColQwen2Processor.from_pretrained(settings.embed_model)
+        logger.info("[ColQwen2] Ready (dim=%s)", getattr(self.model, "dim", settings.embed_dim))
+
+    @staticmethod
+    def _resolve_device(torch_module):
+        if torch_module.cuda.is_available():
+            return torch_module.device("cuda")
+        if hasattr(torch_module.backends, "mps") and torch_module.backends.mps.is_available():
+            return torch_module.device("mps")
+        return torch_module.device("cpu")
+
+    def encode_images(self, images: list[Image.Image]) -> list[list[list[float]]]:
+        all_embeddings: list[list[list[float]]] = []
+        batch_size = settings.colqwen2_batch_size
+
+        for i in range(0, len(images), batch_size):
+            batch = images[i:i + batch_size]
+            n = len(batch)
+
+            logger.info(
+                "[ColQwen2] Encoding batch %d-%d/%d (%d pages)...",
+                i,
+                min(i + batch_size, len(images)),
+                len(images),
+                n,
+            )
+            inputs = self.processor.process_images(batch).to(self.device)
+            with self.torch.no_grad():
+                batch_embs = self.model(**inputs)
+
+            page_embeddings = batch_embs.cpu().float().tolist()
+            if page_embeddings:
+                logger.info(
+                    "[ColQwen2] Got %d pages (patches≈%d, dim=%d)",
+                    len(page_embeddings),
+                    len(page_embeddings[0]),
+                    len(page_embeddings[0][0]) if page_embeddings[0] else 0,
+                )
+            all_embeddings.extend(page_embeddings)
+
+        return all_embeddings
+
+    def encode_query(self, query: str) -> list[list[float]]:
+        logger.info("[ColQwen2] Encoding query: %s", query[:50])
+        inputs = self.processor.process_queries([query]).to(self.device)
+        with self.torch.no_grad():
+            query_embs = self.model(**inputs)
+
+        query_vectors = query_embs[0].cpu().float().tolist()
+        logger.info(
+            "[ColQwen2] Query token vectors=%d, dim=%d",
+            len(query_vectors),
+            len(query_vectors[0]) if query_vectors else 0,
+        )
+        return query_vectors
+
+
 def create_embedder() -> BaseEmbedder:
     """Factory: create embedder based on settings.embed_provider."""
     provider = settings.embed_provider.lower()
@@ -161,5 +247,8 @@ def create_embedder() -> BaseEmbedder:
     elif provider in ("dashscope", "qwen", "tongyi"):
         logger.info("Using DashScope embedder (model=%s, dim=%d)", settings.embed_model, settings.embed_dim)
         return DashScopeEmbedder()
+    elif provider == "colqwen2":
+        logger.info("Using local ColQwen2 embedder (model=%s, dim=%d)", settings.embed_model, settings.embed_dim)
+        return ColQwen2Embedder()
     else:
-        raise ValueError(f"Unknown embed provider: {provider}. Use 'cohere' or 'dashscope'.")
+        raise ValueError(f"Unknown embed provider: {provider}. Use 'cohere', 'dashscope', or 'colqwen2'.")

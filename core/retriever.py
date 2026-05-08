@@ -23,12 +23,12 @@ class Retriever:
 
     def retrieve(self, query: str, doc_name: str = None,
                  top_k: int = None) -> list[RetrievalResult]:
-        """Encode query, search Zilliz, return top-K most relevant pages."""
+        """Encode query, search Milvus, return top-K most relevant pages."""
         if top_k is None:
             top_k = settings.top_k
 
         query_vector = self.embedder.encode_query(query)
-        logger.info("Searching Zilliz, top_k=%d, doc_filter=%s", top_k, doc_name)
+        logger.info("Searching Milvus, top_k=%d, doc_filter=%s", top_k, doc_name)
         hits = self.vector_store.search(query_vector, top_k=top_k, doc_name=doc_name)
 
         results = [

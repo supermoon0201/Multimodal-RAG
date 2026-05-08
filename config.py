@@ -7,7 +7,7 @@ load_dotenv()
 
 @dataclass
 class Settings:
-    # Embedding provider: "cohere" or "dashscope"
+    # Embedding provider: "cohere", "dashscope", or "colqwen2"
     embed_provider: str = "dashscope"
 
     # Cohere
@@ -21,16 +21,23 @@ class Settings:
     dashscope_model: str = "tongyi-embedding-vision-plus"
     dashscope_dim: int = 1152
 
+    # ColQwen2 (local deployment)
+    colqwen2_model_path: str = "./models/colqwen2-v1.0-merged"
+    colqwen2_dim: int = 128
+    colqwen2_batch_size: int = 2
+    colqwen2_candidate_patches: int = 300
+
     # Current active settings (resolved from provider)
     embed_model: str = ""
     embed_dim: int = 0
 
-    # Milvus / Zilliz
-    milvus_uri: str = ""
+    # Milvus
+    milvus_uri: str = "./data/milvus.db"
     milvus_token: str = ""
     collection_name: str = ""
     cohere_collection_name: str = "pdf_rag_cohere"
     dashscope_collection_name: str = "pdf_rag_dashscope"
+    colqwen2_collection_name: str = "pdf_rag_colqwen2"
     index_type: str = "IVF_FLAT"
 
     # Retrieval
@@ -57,12 +64,16 @@ class Settings:
         self.embed_provider = os.getenv("EMBED_PROVIDER", self.embed_provider).lower()
         self.cohere_api_key = os.getenv("COHERE_API_KEY", self.cohere_api_key)
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY", self.dashscope_api_key)
-        self.milvus_uri = os.getenv("MILVUS_HOST", self.milvus_uri)
+        self.colqwen2_model_path = os.getenv("COLQWEN2_MODEL_PATH", self.colqwen2_model_path)
+        self.colqwen2_batch_size = int(os.getenv("COLQWEN2_BATCH_SIZE", self.colqwen2_batch_size))
+        self.colqwen2_candidate_patches = int(os.getenv("COLQWEN2_CANDIDATE_PATCHES", self.colqwen2_candidate_patches))
+        self.milvus_uri = os.getenv("MILVUS_URI", os.getenv("MILVUS_HOST", self.milvus_uri))
         self.milvus_token = os.getenv("MILVUS_TOKEN", self.milvus_token)
         self.index_type = os.getenv("INDEX", self.index_type)
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", self.openrouter_api_key)
         self.cohere_collection_name = os.getenv("COHERE_COLLECTION_NAME", self.cohere_collection_name)
         self.dashscope_collection_name = os.getenv("DASHSCOPE_COLLECTION_NAME", self.dashscope_collection_name)
+        self.colqwen2_collection_name = os.getenv("COLQWEN2_COLLECTION_NAME", self.colqwen2_collection_name)
         self.llm_provider = os.getenv("LLM_PROVIDER", self.llm_provider).lower()
         self.dashscope_vl_model = os.getenv("DASHSCOPE_VL_MODEL", self.dashscope_vl_model)
 
@@ -71,6 +82,10 @@ class Settings:
             self.embed_model = self.cohere_model
             self.embed_dim = self.cohere_dim
             self.collection_name = self.cohere_collection_name
+        elif self.embed_provider == "colqwen2":
+            self.embed_model = self.colqwen2_model_path
+            self.embed_dim = self.colqwen2_dim
+            self.collection_name = self.colqwen2_collection_name
         else:
             self.embed_model = self.dashscope_model
             self.embed_dim = self.dashscope_dim

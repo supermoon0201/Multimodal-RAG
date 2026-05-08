@@ -7,3 +7,7 @@ pillow>=10.0.0
 flask>=3.0.0
 numpy>=1.24.0
 python-dotenv>=1.0.0
+
+# Optional: local ColQwen2 embedding
+colpali-engine>=0.3.0
+torch>=2.2.0

@@ -26,6 +26,7 @@ import traceback
 from pathlib import Path
 
 from flask import Flask, request, jsonify, send_file
+from PIL import Image
 from config import settings
 from utils.pdf_processor import pdf_page_to_image
 from core.embedder import create_embedder
@@ -68,6 +69,7 @@ def _get_page(doc_name: str, page_idx: int):
 
 def get_components():
     if "vector_store" not in _components:
+        logger.info("[API] Connecting to Milvus: %s", settings.milvus_uri)
         _components["vector_store"] = VectorStore()
     if "embedder" not in _components:
         _components["embedder"] = create_embedder()

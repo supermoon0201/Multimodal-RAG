@@ -1,6 +1,6 @@
 # Multimodal RAG - PDF Intelligent Q&A
 
-基于多模态 Embedding + Zilliz + Qwen 视觉理解的多模态 RAG 系统。支持 **Cohere / DashScope Embedding** 和 **DashScope / OpenRouter LLM** 双引擎切换。上传 PDF，用自然语言提问，系统自动检索最相关的页面并由 AI 生成回答。
+基于多模态 Embedding + 本地 Milvus + Qwen 视觉理解的多模态 RAG 系统。支持 **Cohere / DashScope / 本地 ColQwen2 Embedding** 和 **DashScope / OpenRouter LLM** 双引擎切换。上传 PDF，用自然语言提问，系统自动检索最相关的页面并由 AI 生成回答。
 
 与传统 RAG 不同，本系统**不做文本提取和 OCR**，而是直接将 PDF 页面当作图片处理，通过视觉 Embedding 模型编码，完整保留表格、图表、排版、手写批注等所有视觉信息。
 
@@ -12,12 +12,12 @@ PDF 文档
   ▼ (PyMuPDF, 150 DPI)
 页面图片（不做任何文本提取）
   │
-  ▼ (Embedding API, 云端调用)
+  ▼ (Embedding API / 本地模型)
   │   ├─ Cohere embed-v4.0 → 1 个 1024 维向量
   │   └─ DashScope tongyi-embedding-vision-plus → 1 个 1152 维向量
 每页图片 → 1 个向量
   │
-  ▼ (写入 Zilliz Serverless 云向量数据库)
+  ▼ (写入本地 Milvus 向量数据库)
 doc_name + page_idx + vector
   │
   ══════════════ 用户提问时 ══════════════
@@ -25,7 +25,7 @@ doc_name + page_idx + vector
   ▼ (Embedding API 编码查询文本)
 查询 → 1 个向量
   │
-  ▼ (Zilliz 内积相似度搜索)
+  ▼ (Milvus 内积相似度搜索)
 Top-K 最相关页面
   │
   ▼ (页面原始图片 + 问题 → 视觉大模型生成回答)
@@ -51,8 +51,8 @@ AI 直接"看图"回答问题
 | 组件 | 技术 | 说明 |
 |---|---|---|
 | PDF → 图片 | PyMuPDF (fitz) | 纯 Python，无需 poppler，跨平台直接可用 |
-| 图片/文本编码 | [Cohere embed-v4.0](https://docs.cohere.com/docs/embeddings) / [DashScope](https://dashscope.aliyun.com) | 云端多模态 Embedding，通过 `EMBED_PROVIDER` 切换引擎 |
-| 向量数据库 | [Zilliz Serverless](https://cloud.zilliz.com) (云 Milvus) | IVF_FLAT 索引，内积相似度，零运维 |
+| 图片/文本编码 | [Cohere embed-v4.0](https://docs.cohere.com/docs/embeddings) / [DashScope](https://dashscope.aliyun.com) / [ColQwen2](https://github.com/illuin-tech/colpali) | 云端多模态 Embedding 或本地 ColQwen2，通过 `EMBED_PROVIDER` 切换引擎 |
+| 向量数据库 | [Milvus](https://milvus.io) / Milvus Lite | 默认使用本地 Milvus Lite 文件数据库，支持 IVF_FLAT 索引和内积相似度 |
 | 生成模型 | [DashScope Qwen](https://dashscope.console.aliyun.com) / [OpenRouter](https://openrouter.ai) | 多模态视觉大模型，通过 `LLM_PROVIDER` 切换 |
 | Web 界面 | Flask + 原生 HTML/JS | 轻量无框架依赖，无 telemetry，本地运行 |
 
@@ -79,8 +79,8 @@ D:/PDF-AI/
 │
 ├── core/
 │   ├── embedder.py         # 双引擎 Embedding（Cohere / DashScope）+ 工厂函数
-│   ├── vector_store.py     # Zilliz 向量库：集合管理、插入、搜索
-│   ├── retriever.py        # 单向量检索：编码查询 → 搜索 Zilliz → Top-K 页面
+│   ├── vector_store.py     # Milvus 向量库：集合管理、插入、搜索
+│   ├── retriever.py        # 单向量检索：编码查询 → 搜索 Milvus → Top-K 页面
 │   └── generator.py        # 双引擎 LLM 生成（DashScope / OpenRouter）
 │
 └── utils/
@@ -98,7 +98,7 @@ D:/PDF-AI/
 | POST | `/api/upload` | 上传 PDF 文件 | `multipart/form-data`，字段 `file` |
 | POST | `/api/encode` | 编码已上传的 PDF 并写入向量库 | `{"doc_name": "xxx.pdf"}` |
 | POST | `/api/search` | 检索相关页面并生成回答 | `{"question": "...", "doc_name": "xxx.pdf"}` |
-| POST | `/api/clear` | 清空所有数据（Zilliz + 本地文件） | 无 |
+| POST | `/api/clear` | 清空所有数据（Milvus + 本地文件） | 无 |
 
 搜索接口返回示例：
 ```json
@@ -113,7 +113,7 @@ D:/PDF-AI/
 
 ### 独立 API 问答服务（端口 7861）
 
-`api_server.py` 提供轻量级问答接口，供外部程序集成调用，与 Web 服务共享相同的 Embedding、Zilliz、LLM 流程。
+`api_server.py` 提供轻量级问答接口，供外部程序集成调用，与 Web 服务共享相同的 Embedding、Milvus、LLM 流程。
 
 **启动**：
 ```bash
@@ -171,7 +171,7 @@ curl -X POST http://127.0.0.1:7861/api/query \
 │  ├── paper.pdf           服务重启/页面刷新后仍在        │
 │  └── ...                                             │
 ├─────────────────────────────────────────────────────┤
-│  Zilliz Cloud  (云端向量库)                           │
+│  Milvus Lite / 本地 Milvus Server                   │
 │  集合: pdf_rag_cohere / pdf_rag_dashscope（按引擎自动选择）│
 │  每条记录: doc_name + page_idx + vector(由引擎决定维度)│
 │  已 encode 的文档向量永久保存，不受重启影响             │
@@ -184,11 +184,11 @@ curl -X POST http://127.0.0.1:7861/api/query \
 
 **为什么刷新页面后仍可搜索**：
 - PDF 文件保存在 `data/uploads/`，不是临时文件
-- 向量数据存在 Zilliz 云端，不在本地内存
+- 向量数据存在本地 Milvus 中，不在进程内存
 - 页面加载时，前端调用 `GET /api/docs` 扫描 `data/uploads/` 获取文档列表
 - 搜索时，如果图片不在内存缓存，自动从 PDF 文件按需加载
 
-### Zilliz 集合 Schema
+### Milvus 集合 Schema
 
 ```
 集合名: pdf_rag_cohere (Cohere) / pdf_rag_dashscope (DashScope)
@@ -236,7 +236,7 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
   │       模型: embed-v4.0，input_type=search_document，产出 1024 维向量
   │   每页产出 1 个向量（维度由引擎决定）
   │
-  └── Step 3: 写入 Zilliz
+  └── Step 3: 写入 Milvus
       每页一条记录: {doc_name, page_idx, vector}
       如果该文档之前已 encode 过，向量会重复插入
       （建议 clear 后重新 encode，或后续优化为 upsert）
@@ -254,8 +254,8 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
   │   └─ Cohere: embed(texts=[...], input_type="search_query") → 1024 维
   │   问题文本 → 1 个向量
   │
-  ├── Step 2: 向量搜索 (Zilliz)
-  │   用查询向量在 Zilliz 中做内积相似度搜索
+  ├── Step 2: 向量搜索 (Milvus)
+  │   用查询向量在 Milvus 中做内积相似度搜索
   │   如果指定了 doc_name，添加过滤条件 filter='doc_name == "xxx"'
   │   如果选 "All Documents"，不加过滤，跨文档搜索
   │   返回 Top-K (默认 3) 条结果，每条包含 doc_name + page_idx + score
@@ -295,7 +295,7 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
   │
   ▼ POST /api/clear
   │
-  ├── 删除 Zilliz 集合并重建空集合
+  ├── 删除 Milvus 集合并重建空集合
   ├── 删除 data/uploads/ 下所有 PDF 文件
   └── 清空内存图片缓存
 ```
@@ -305,8 +305,8 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
 ### 1. 环境要求
 
 - Python 3.10+
-- 无需 GPU、无需 poppler、无需 CUDA
-- 网络能访问 DashScope API、Zilliz Cloud（国内用户推荐全选 DashScope，只需一个 API Key）
+- 基础模式无需 GPU、无需 poppler、无需 CUDA；若启用本地 ColQwen2，则需要 PyTorch，GPU 可选但推荐
+- 网络能访问 DashScope API；本地 Milvus 不需要额外云端服务
 
 ### 2. 安装依赖
 
@@ -314,7 +314,7 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
 pip install -r requirements.txt
 ```
 
-共 9 个轻量包（cohere、dashscope、pymilvus、openai、PyMuPDF、pillow、flask、numpy、python-dotenv），安装通常在 1 分钟内完成。
+基础模式共 9 个轻量包（cohere、dashscope、pymilvus、openai、PyMuPDF、pillow、flask、numpy、python-dotenv），安装通常在 1 分钟内完成。若启用本地 ColQwen2，再额外安装 `torch` 和 `colpali-engine`。
 
 ### 3. 获取 API Key
 
@@ -322,16 +322,18 @@ pip install -r requirements.txt
 
 **Cohere**（Embedding，可选引擎）：前往 [https://dashboard.cohere.com/api-keys](https://dashboard.cohere.com/api-keys) 注册获取，有免费额度。
 
+**ColQwen2**（本地 Embedding，可选引擎）：下载或准备好本地模型目录，例如 `./models/colqwen2-v1.0-merged`，不需要额外 API Key。
+
 **OpenRouter**（LLM，可选引擎）：前往 [https://openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) 注册获取。
 
-**Zilliz Cloud**（向量数据库，必需）：前往 [https://cloud.zilliz.com](https://cloud.zilliz.com) 创建 Serverless 集群，获取连接地址和 Token。
+**Milvus**（向量数据库，默认本地）：本项目默认使用 Milvus Lite 文件数据库 `./data/milvus.db`。如果你已经在本机启动了 Milvus Server，也可以直接填本地连接地址。
 
 ### 4. 配置 .env
 
 复制 `.env.example` 为 `.env`，填入实际值：
 
 ```env
-# Embedding 引擎（dashscope 或 cohere）
+# Embedding 引擎（dashscope / cohere / colqwen2）
 EMBED_PROVIDER=dashscope
 
 # DashScope API Key（Embedding + LLM 共用，国内推荐）
@@ -339,6 +341,18 @@ DASHSCOPE_API_KEY=your-dashscope-api-key
 
 # Cohere API Key（使用 Cohere Embedding 时必需）
 COHERE_API_KEY=your-cohere-api-key
+
+# 本地 ColQwen2 模型路径（仅在 EMBED_PROVIDER=colqwen2 时使用）
+COLQWEN2_MODEL_PATH=./models/colqwen2-v1.0-merged
+
+# ColQwen2 每批编码页数（本地部署时可按显存/内存调小）
+COLQWEN2_BATCH_SIZE=2
+
+# ColQwen2 检索候选 patch 数（MaxSim 聚合时的搜索上限）
+COLQWEN2_CANDIDATE_PATCHES=300
+
+# ColQwen2 集合名
+COLQWEN2_COLLECTION_NAME=pdf_rag_colqwen2
 
 # LLM 引擎（dashscope 或 openrouter）
 LLM_PROVIDER=dashscope
@@ -349,9 +363,12 @@ DASHSCOPE_VL_MODEL=qwen3.5-flash
 # OpenRouter API Key（使用 OpenRouter LLM 时必需）
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
 
-# Zilliz Serverless 连接信息（必需）
-MILVUS_HOST=https://your-cluster-id.serverless.ali-cn-hangzhou.cloud.zilliz.com.cn
-MILVUS_TOKEN=your-zilliz-token-here
+# Milvus 连接信息（默认使用本地 Milvus Lite）
+MILVUS_URI=./data/milvus.db
+
+# 如果你改用本地/自建 Milvus Server，也可以改成：
+# MILVUS_URI=http://127.0.0.1:19530
+# MILVUS_TOKEN=
 
 # 向量集合名（每个引擎独立，不会冲突）
 COHERE_COLLECTION_NAME=pdf_rag_cohere
@@ -368,6 +385,48 @@ python app.py
 ```
 
 浏览器访问 `http://127.0.0.1:7860`。
+
+### 6. 本地 ColQwen2 最短启动路径
+
+如果你要切到本地 ColQwen2，最小步骤就是下面这几步：
+
+1. 安装额外依赖
+
+```bash
+pip install torch colpali-engine
+```
+
+2. 准备本地模型目录
+
+推荐目录：
+
+```bash
+./models/colqwen2-v1.0-merged
+```
+
+模型目录里至少要包含 HuggingFace 导出的模型权重和 processor 相关文件。
+
+3. 在 `.env` 中切换 Embedding 引擎
+
+```env
+EMBED_PROVIDER=colqwen2
+COLQWEN2_MODEL_PATH=./models/colqwen2-v1.0-merged
+COLQWEN2_BATCH_SIZE=2
+COLQWEN2_CANDIDATE_PATCHES=300
+COLQWEN2_COLLECTION_NAME=pdf_rag_colqwen2
+MILVUS_URI=./data/milvus.db
+```
+
+4. 启动服务
+
+```bash
+python app.py
+```
+
+5. 上传 PDF 后重新执行一次索引入库
+
+原因：
+ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集合不兼容，切换引擎后必须重新编码文档。
 
 ## 使用方法
 
@@ -390,12 +449,14 @@ python app.py
 
 | 参数 | .env 变量 | 默认值 | 说明 |
 |---|---|---|---|
-| `embed_provider` | `EMBED_PROVIDER` | `dashscope` | Embedding 引擎：`dashscope`（国内推荐）或 `cohere` |
+| `embed_provider` | `EMBED_PROVIDER` | `dashscope` | Embedding 引擎：`dashscope`（国内推荐）、`cohere` 或 `colqwen2` |
 | `dashscope_api_key` | `DASHSCOPE_API_KEY` | — | DashScope API 密钥（Embedding + LLM 共用） |
 | `cohere_api_key` | `COHERE_API_KEY` | — | Cohere API 密钥（使用 Cohere 时必需） |
-| `embed_model` | — | 由 provider 决定 | DashScope: `tongyi-embedding-vision-plus` / Cohere: `embed-v4.0` |
-| `embed_dim` | — | 由 provider 决定 | DashScope: 1152 / Cohere: 1024 |
+| `embed_model` | — | 由 provider 决定 | DashScope: `tongyi-embedding-vision-plus` / Cohere: `embed-v4.0` / ColQwen2: 本地模型路径 |
+| `embed_dim` | — | 由 provider 决定 | DashScope: 1152 / Cohere: 1024 / ColQwen2: 128 |
 | `cohere_batch_size` | — | `96` | Cohere 每批编码页数（DashScope 固定 8 张/次） |
+| `colqwen2_batch_size` | `COLQWEN2_BATCH_SIZE` | `2` | ColQwen2 每批编码页数 |
+| `colqwen2_candidate_patches` | `COLQWEN2_CANDIDATE_PATCHES` | `300` | ColQwen2 查询 token 搜索时的候选 patch 数 |
 | `llm_provider` | `LLM_PROVIDER` | `dashscope` | LLM 引擎：`dashscope`（国内推荐）或 `openrouter` |
 | `dashscope_vl_model` | `DASHSCOPE_VL_MODEL` | `qwen3.5-flash` | DashScope 视觉模型（`qwen3.5-flash` / `qwen3.5-plus` / `qwen3-vl-plus`） |
 | `openrouter_api_key` | `OPENROUTER_API_KEY` | — | OpenRouter API 密钥（使用 OpenRouter 时必需） |
@@ -405,10 +466,12 @@ python app.py
 | `llm_temperature` | — | `0.7` | LLM 生成温度 |
 | `pdf_dpi` | — | `150` | PDF 渲染 DPI |
 | `max_image_size` | — | `1200` | 图片最大边长 px |
-| `milvus_uri` | `MILVUS_HOST` | — | Zilliz 连接地址（必需） |
-| `milvus_token` | `MILVUS_TOKEN` | — | Zilliz 认证 Token（必需） |
+| `milvus_uri` | `MILVUS_URI` | `./data/milvus.db` | Milvus 连接地址或本地文件路径 |
+| `milvus_token` | `MILVUS_TOKEN` | — | Milvus 认证 Token（本地 Milvus Lite 通常留空） |
 | `cohere_collection_name` | `COHERE_COLLECTION_NAME` | `pdf_rag_cohere` | Cohere 引擎的向量集合名 |
 | `dashscope_collection_name` | `DASHSCOPE_COLLECTION_NAME` | `pdf_rag_dashscope` | DashScope 引擎的向量集合名 |
+| `colqwen2_collection_name` | `COLQWEN2_COLLECTION_NAME` | `pdf_rag_colqwen2` | ColQwen2 本地模型的向量集合名 |
+| `colqwen2_model_path` | `COLQWEN2_MODEL_PATH` | `./models/colqwen2-v1.0-merged` | 本地 ColQwen2 模型目录或 HuggingFace 路径 |
 | `index_type` | `INDEX` | `IVF_FLAT` | 向量索引类型 |
 
 ## 常见问题
@@ -423,7 +486,7 @@ pip install -r requirements.txt
 
 ### Q: 编码成功但搜索无结果 / 显示 0 vectors
 
-检查集合名是否正确，切换 Embedding 引擎后需重新编码文档。
+检查集合名是否正确，切换 Embedding 引擎后需重新编码文档。ColQwen2 与单向量引擎使用不同的集合。
 
 ### Q: Cohere API 报错 401 / 429
 
@@ -436,15 +499,31 @@ pip install -r requirements.txt
 - 检查 `DASHSCOPE_API_KEY` 是否正确
 - 前往 [DashScope 控制台](https://dashscope.console.aliyun.com) 查看用量和余额
 
+### Q: 启用 ColQwen2 后报错 `No module named 'torch'` / `colpali_engine`
+
+先安装 ColQwen2 依赖：
+
+```bash
+pip install torch colpali-engine
+```
+
+然后确认 `.env` 里的 `EMBED_PROVIDER=colqwen2` 和 `COLQWEN2_MODEL_PATH` 指向本地模型目录。
+
+### Q: ColQwen2 模型加载失败
+
+- 检查本地模型目录是否完整
+- 确认 `COLQWEN2_MODEL_PATH` 路径正确
+- 如果显存不足，调小 `COLQWEN2_BATCH_SIZE`
+
 ### Q: 切换 Embedding 引擎后搜索报错维度不匹配
 
-不会发生。每个引擎使用独立的集合（`pdf_rag_cohere` / `pdf_rag_dashscope`），切换引擎后自动连接对应集合，数据互不干扰。但每个集合的文档需要独立 encode。
+不会发生。每个引擎使用独立的集合（`pdf_rag_cohere` / `pdf_rag_dashscope` / `pdf_rag_colqwen2`），切换引擎后自动连接对应集合，数据互不干扰。但每个集合的文档需要独立 encode。
 
-### Q: Zilliz 连接失败
+### Q: Milvus 连接失败
 
-检查 `.env` 中的 `MILVUS_HOST` 和 `MILVUS_TOKEN`。确认 Zilliz Serverless 集群已创建且处于运行状态。
+检查 `.env` 中的 `MILVUS_URI`。如果使用本地 Milvus Lite，确认 `./data/` 目录可写；如果连接本地/自建 Milvus Server，确认服务已启动且地址正确。
 
-### Q: Zilliz 报错 `Insert missed a field`
+### Q: Milvus 报错 `Insert missed a field`
 
 集合 schema 与代码不匹配（可能是旧集合）。在 `.env` 中更换 `COHERE_COLLECTION_NAME` 或 `DASHSCOPE_COLLECTION_NAME` 为一个新名称即可。
 
@@ -476,7 +555,7 @@ app.py (Flask Web 服务:7860, 5 个 API 路由 — 文档管理 + 问答)
 api_server.py (独立 API 服务:7861, 2 个 API 路由 — 问答接口，供外部调用)
   ├── config.py (配置中心, 从 .env 加载变量)
   ├── utils/pdf_processor.py (PDF → 图片, PyMuPDF)
-  ├── core/vector_store.py (Zilliz 操作)
+  ├── core/vector_store.py (Milvus 操作)
   ├── core/embedder.py (双引擎 Embedding: Cohere / DashScope, create_embedder() 工厂)
   │     ├── utils/image_utils.py (图片 → base64, data URI / 纯 base64 两种格式)
   │     └── config.py
@@ -496,23 +575,23 @@ api_server.py (独立 API 服务:7861, 2 个 API 路由 — 问答接口，供�
 
 **`utils/image_utils.py`** — `image_to_data_uri(img, max_size, fmt)` 将 PIL Image 缩放后转为 base64 data URI（Cohere 使用）。`pil_to_base64(img, max_size, fmt)` 返回纯 base64 字符串（DashScope 使用）。
 
-**`core/embedder.py`** — 双引擎 Embedding 封装。`BaseEmbedder` 定义接口，`CohereEmbedder` 封装 Cohere embed-v4.0 API，`DashScopeEmbedder` 封装 DashScope tongyi-embedding-vision-plus API。`create_embedder()` 工厂函数根据 `settings.embed_provider` 返回对应实例。两个引擎均实现 `encode_images()` 和 `encode_query()`，并内置速率限制。
+**`core/embedder.py`** — Embedding 封装。`BaseEmbedder` 定义接口，`CohereEmbedder` 封装 Cohere embed-v4.0 API，`DashScopeEmbedder` 封装 DashScope tongyi-embedding-vision-plus API，`ColQwen2Embedder` 封装本地 `ColQwen2` 多向量模型。`create_embedder()` 工厂函数根据 `settings.embed_provider` 返回对应实例。三个引擎均实现 `encode_images()` 和 `encode_query()`，并内置各自所需的处理逻辑。
 
-**`core/vector_store.py`** — `VectorStore` 封装 Zilliz 操作。首次连接自动创建集合。`insert_pages()` 按页插入向量，`search()` 支持按 doc_name 过滤。用 MilvusClient 的 search 方法做内积搜索。
+**`core/vector_store.py`** — `VectorStore` 封装 Milvus 操作。首次连接自动创建集合。`insert_pages()` 在单向量模式下按页插入向量，在 ColQwen2 模式下按 patch 插入多向量。`search()` 支持按 doc_name 过滤；ColQwen2 模式会对查询 token 做 MaxSim 聚合后返回页面分数。用 MilvusClient 的 search 方法做内积搜索。
 
-**`core/retriever.py`** — `Retriever` 组合 embedder + vector_store。`retrieve()` 依次调用编码查询 → 搜索 Zilliz → 返回 `RetrievalResult` 列表。`expand_pages()` 对命中结果做 ±2 页扩展，自动去重和边界检查，让 LLM 获得更完整的上下文。
+**`core/retriever.py`** — `Retriever` 组合 embedder + vector_store。`retrieve()` 依次调用编码查询 → 搜索 Milvus → 返回 `RetrievalResult` 列表。`expand_pages()` 对命中结果做 ±2 页扩展，自动去重和边界检查，让 LLM 获得更完整的上下文。
 
 **`core/generator.py`** — 双引擎 LLM 生成。`AnswerGenerator` 根据 `settings.llm_provider` 初始化 OpenAI 兼容客户端：DashScope 走 `dashscope.aliyuncs.com/compatible-mode/v1`，OpenRouter 走 `openrouter.ai/api/v1`。两者消息格式完全相同，`generate()` 构建多模态消息（图片 base64 + 文本 prompt），发给视觉大模型生成回答。
 
 **`app.py`** — Flask Web 服务（端口 7860）。`data/uploads/` 持久化 PDF 文件，`_image_cache` 内存缓存页面图片（按需从 PDF 加载）。5 个 API 路由，每个都有 try/except + logging。组件懒加载（首次使用时初始化）。
 
-**`api_server.py`** — 独立 API 问答服务（端口 7861）。提供 `/api/query` 和 `/api/docs` 两个接口，供外部程序集成调用。与 `app.py` 共享相同的 Embedding、Zilliz、LLM 流程和 `data/uploads/` 数据目录，但不包含文档管理和前端。两个服务可同时运行，互不冲突。
+**`api_server.py`** — 独立 API 问答服务（端口 7861）。提供 `/api/query` 和 `/api/docs` 两个接口，供外部程序集成调用。与 `app.py` 共享相同的 Embedding、Milvus、LLM 流程和 `data/uploads/` 数据目录，但不包含文档管理和前端。两个服务可同时运行，互不冲突。
 
 ### 扩展方向
 
 - **添加新 LLM 后端**：在 `core/generator.py` 中添加新的 `base_url` 分支，支持 OpenAI / Azure / 本地模型
 - **添加新 Embedding 引擎**：在 `core/embedder.py` 中继承 `BaseEmbedder`，实现 `encode_images()` 和 `encode_query()`，并在 `create_embedder()` 工厂中注册
-- **本地 Embedding 回退**：如需离线使用，可继承 `BaseEmbedder` 接入 ColQwen2 本地模型（需安装 PyTorch）
+- **本地 Embedding 回退**：已支持 ColQwen2 本地模型，适合离线或内网部署；如需扩展其他本地模型，可继承 `BaseEmbedder`
 - **添加对话历史**：在 `app.py` 中增加会话管理，维护多轮对话上下文
 - **前端升级**：`static/index.html` 为纯原生 HTML/JS，可按需引入 Vue/React 或替换为其他前端框架
 
