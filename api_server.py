@@ -124,7 +124,7 @@ def query():
         if not results:
             return jsonify({"answer": "未找到相关页面。", "pages": []})
 
-        expanded = expand_pages(results, UPLOAD_DIR, window=2)
+        expanded = expand_pages(results, UPLOAD_DIR, window=settings.retrieval_window)
 
         pages = []
         context_images = []

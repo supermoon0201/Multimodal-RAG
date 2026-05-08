@@ -46,6 +46,7 @@ class Settings:
 
     # Retrieval
     top_k: int = 3
+    retrieval_window: int = 2
 
     # LLM
     llm_provider: str = "openai_compatible"  # "openai_compatible", "openrouter", or "dashscope"
@@ -82,6 +83,8 @@ class Settings:
         self.index_type = os.getenv("INDEX", self.index_type)
         self.ivf_nlist = int(os.getenv("IVF_NLIST", self.ivf_nlist))
         self.ivf_nprobe = int(os.getenv("IVF_NPROBE", self.ivf_nprobe))
+        self.top_k = int(os.getenv("TOP_K", self.top_k))
+        self.retrieval_window = int(os.getenv("RETRIEVAL_WINDOW", self.retrieval_window))
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", self.openrouter_api_key)
         self.cohere_collection_name = os.getenv("COHERE_COLLECTION_NAME", self.cohere_collection_name)
         self.dashscope_collection_name = os.getenv("DASHSCOPE_COLLECTION_NAME", self.dashscope_collection_name)

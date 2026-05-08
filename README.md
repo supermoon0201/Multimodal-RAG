@@ -487,7 +487,8 @@ ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集�
 | `dashscope_vl_model` | `DASHSCOPE_VL_MODEL` | `qwen3.5-flash` | DashScope 视觉模型（`qwen3.5-flash` / `qwen3.5-plus` / `qwen3-vl-plus`） |
 | `openrouter_api_key` | `OPENROUTER_API_KEY` | — | OpenRouter API 密钥（使用 OpenRouter 时必需） |
 | `generation_model` | — | 由 provider 决定 | DashScope: `qwen3.5-flash` / OpenRouter: `qwen/qwen3.5-397b-a17b` |
-| `top_k` | — | `3` | 检索返回的页面数 |
+| `top_k` | `TOP_K` | `3` | 检索返回的页面数 |
+| `retrieval_window` | `RETRIEVAL_WINDOW` | `2` | 命中页上下文扩展窗口；`2` 表示向前/向后各扩展 2 页 |
 | `llm_max_tokens` | — | `1024` | LLM 最大输出 token 数 |
 | `llm_temperature` | — | `0.7` | LLM 生成温度 |
 | `pdf_dpi` | — | `150` | PDF 渲染 DPI |
