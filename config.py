@@ -26,6 +26,7 @@ class Settings:
     colqwen2_dim: int = 128
     colqwen2_batch_size: int = 2
     colqwen2_candidate_patches: int = 300
+    colqwen2_rerank_candidates: int = 200
     colqwen2_device: str = "auto"
 
     # Current active settings (resolved from provider)
@@ -74,6 +75,7 @@ class Settings:
         self.colqwen2_model_path = os.getenv("COLQWEN2_MODEL_PATH", self.colqwen2_model_path)
         self.colqwen2_batch_size = int(os.getenv("COLQWEN2_BATCH_SIZE", self.colqwen2_batch_size))
         self.colqwen2_candidate_patches = int(os.getenv("COLQWEN2_CANDIDATE_PATCHES", self.colqwen2_candidate_patches))
+        self.colqwen2_rerank_candidates = int(os.getenv("COLQWEN2_RERANK_CANDIDATES", self.colqwen2_rerank_candidates))
         self.colqwen2_device = os.getenv("COLQWEN2_DEVICE", self.colqwen2_device).lower()
         self.milvus_uri = os.getenv("MILVUS_URI", os.getenv("MILVUS_HOST", self.milvus_uri))
         self.milvus_token = os.getenv("MILVUS_TOKEN", self.milvus_token)
