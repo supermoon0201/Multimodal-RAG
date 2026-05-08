@@ -165,17 +165,18 @@ class ColQwen2Embedder(BaseEmbedder):
                 "`pip install -U -r requirements.txt`."
             ) from exc
 
-        self._validate_torch_version(torch)
-
         try:
+            import transformers
             from colpali_engine.models import ColQwen2, ColQwen2Processor
             from transformers.utils.import_utils import is_flash_attn_2_available
         except Exception as exc:
             raise RuntimeError(
                 "ColQwen2 requires `torch`, `colpali-engine`, and `transformers`. "
-                "Install compatible versions with `pip install -U -r requirements.txt`. "
+                "Install compatible versions with `pip install -U -r requirements-colqwen2.txt`. "
                 "If you recently upgraded dependencies, restart the Flask process."
             ) from exc
+
+        self._validate_local_stack(torch, transformers)
 
         self.torch = torch
         self.device = self._resolve_device(torch)
@@ -196,16 +197,31 @@ class ColQwen2Embedder(BaseEmbedder):
         logger.info("[ColQwen2] Ready (dim=%s)", getattr(self.model, "dim", settings.embed_dim))
 
     @staticmethod
-    def _validate_torch_version(torch_module):
-        version_match = re.match(r"^(\d+)\.(\d+)", torch_module.__version__)
+    def _parse_major_minor(version: str) -> tuple[int, int] | None:
+        version_match = re.match(r"^(\d+)\.(\d+)", version)
         if not version_match:
+            return None
+        return tuple(int(part) for part in version_match.groups())
+
+    @classmethod
+    def _validate_local_stack(cls, torch_module, transformers_module):
+        torch_version = cls._parse_major_minor(torch_module.__version__)
+        transformers_version = cls._parse_major_minor(transformers_module.__version__)
+        if not torch_version or not transformers_version:
             return
 
-        major, minor = (int(part) for part in version_match.groups())
-        if (major, minor) < (2, 4):
+        if torch_version < (2, 2):
             raise RuntimeError(
-                f"ColQwen2 requires torch>=2.4.0, but found torch {torch_module.__version__}. "
-                "Run `pip install -U -r requirements.txt`, then restart the Flask process."
+                f"ColQwen2 requires torch>=2.2.0, but found torch {torch_module.__version__}. "
+                "Run `pip install -U -r requirements-colqwen2.txt`, then restart the Flask process."
+            )
+
+        if torch_version < (2, 4) and transformers_version >= (5, 0):
+            raise RuntimeError(
+                "ColQwen2 has an incompatible local dependency stack: "
+                f"torch {torch_module.__version__} with transformers {transformers_module.__version__}. "
+                "For macOS x86_64, run `pip install -U -r requirements-colqwen2.txt` "
+                "to use the torch 2.2 compatible ColPali stack, then restart the Flask process."
             )
 
     @staticmethod

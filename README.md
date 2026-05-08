@@ -402,11 +402,7 @@ pip install -U -r requirements.txt
 pip install -U -r requirements-colqwen2.txt
 ```
 
-如果你的 pip 镜像源只列出 `torch 2.2.2`，会报 `No matching distribution found for torch<2.11.0,>=2.4.0`。这种情况临时使用官方 PyPI 安装 ColQwen2 依赖：
-
-```bash
-pip install -U -i https://pypi.org/simple -r requirements-colqwen2.txt
-```
+`requirements-colqwen2.txt` 会按平台选择依赖。macOS x86_64 使用 `torch 2.2.x` 兼容栈；其他平台使用新版 ColPali / torch 组合。
 
 2. 准备本地模型目录
 
@@ -522,13 +518,7 @@ pip install -r requirements.txt
 pip install -U -r requirements-colqwen2.txt
 ```
 
-如果你的 pip 镜像源只列出 `torch 2.2.2`，执行：
-
-```bash
-pip install -U -i https://pypi.org/simple -r requirements-colqwen2.txt
-```
-
-然后确认 `.env` 里的 `EMBED_PROVIDER=colqwen2` 和 `COLQWEN2_MODEL_PATH` 指向本地模型目录。如果报错包含 `PyTorch >= 2.4 is required`、`NumPy 2.x` 或 `name 'nn' is not defined`，通常是旧版 torch 与新版 transformers / NumPy 混装导致，执行上面的安装命令后重启 Flask 进程。
+然后确认 `.env` 里的 `EMBED_PROVIDER=colqwen2` 和 `COLQWEN2_MODEL_PATH` 指向本地模型目录。如果报错包含 `PyTorch >= 2.4 is required`、`NumPy 2.x` 或 `name 'nn' is not defined`，通常是 torch、transformers、ColPali、NumPy 混装导致，执行上面的安装命令后重启 Flask 进程。
 
 ### Q: ColQwen2 模型加载失败
 

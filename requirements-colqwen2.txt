@@ -1,8 +1,14 @@
 -r requirements.txt
 
 # Optional local ColQwen2 embedding dependencies.
-# If your package mirror only lists torch up to 2.2.2, install this file from
-# the official PyPI index:
-#   pip install -U -i https://pypi.org/simple -r requirements-colqwen2.txt
-colpali-engine>=0.3.15,<0.4.0
-torch>=2.4.0,<2.11.0
+#
+# macOS x86_64 PyPI wheels only go up to torch 2.2.2, so use the last
+# ColPali stack that supports that torch line there. Newer platforms use
+# the current ColPali stack.
+numpy>=1.24.0,<2.0.0; platform_system == "Darwin" and platform_machine == "x86_64"
+torch>=2.2.0,<2.3.0; platform_system == "Darwin" and platform_machine == "x86_64"
+transformers>=4.47.0,<4.48.0; platform_system == "Darwin" and platform_machine == "x86_64"
+colpali-engine==0.3.8; platform_system == "Darwin" and platform_machine == "x86_64"
+
+torch>=2.4.0,<2.11.0; platform_system != "Darwin" or platform_machine != "x86_64"
+colpali-engine>=0.3.15,<0.4.0; platform_system != "Darwin" or platform_machine != "x86_64"
