@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# Optional local ColQwen2 embedding dependencies.
+# If your package mirror only lists torch up to 2.2.2, install this file from
+# the official PyPI index:
+#   pip install -U -i https://pypi.org/simple -r requirements-colqwen2.txt
+colpali-engine>=0.3.15,<0.4.0
+torch>=2.4.0,<2.11.0
