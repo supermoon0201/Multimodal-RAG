@@ -226,10 +226,43 @@ class ColQwen2Embedder(BaseEmbedder):
 
     @staticmethod
     def _resolve_device(torch_module):
+        configured_device = settings.colqwen2_device
+        allowed_devices = {"auto", "cpu", "cuda", "mps"}
+        if configured_device not in allowed_devices:
+            raise RuntimeError(
+                f"Invalid COLQWEN2_DEVICE={configured_device!r}. "
+                "Use one of: auto, cpu, cuda, mps."
+            )
+
+        if configured_device != "auto":
+            if configured_device == "cuda" and not torch_module.cuda.is_available():
+                raise RuntimeError("COLQWEN2_DEVICE=cuda was requested, but CUDA is not available.")
+            if configured_device == "mps":
+                mps_available = (
+                    hasattr(torch_module.backends, "mps")
+                    and torch_module.backends.mps.is_available()
+                )
+                if not mps_available:
+                    raise RuntimeError("COLQWEN2_DEVICE=mps was requested, but MPS is not available.")
+                logger.warning(
+                    "[ColQwen2] MPS was requested explicitly, but Qwen2-VL uses Conv3D, "
+                    "which is not supported by some PyTorch MPS builds."
+                )
+            return torch_module.device(configured_device)
+
         if torch_module.cuda.is_available():
             return torch_module.device("cuda")
-        if hasattr(torch_module.backends, "mps") and torch_module.backends.mps.is_available():
-            return torch_module.device("mps")
+
+        mps_available = (
+            hasattr(torch_module.backends, "mps")
+            and torch_module.backends.mps.is_available()
+        )
+        if mps_available:
+            logger.warning(
+                "[ColQwen2] MPS is available but not selected because Qwen2-VL uses Conv3D, "
+                "which is unsupported on MPS in common PyTorch builds. Using CPU. "
+                "Set COLQWEN2_DEVICE=mps to override."
+            )
         return torch_module.device("cpu")
 
     def encode_images(self, images: list[Image.Image]) -> list[list[list[float]]]:

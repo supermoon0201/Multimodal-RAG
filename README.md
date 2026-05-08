@@ -348,6 +348,10 @@ COLQWEN2_MODEL_PATH=./models/colqwen2-v1.0-merged
 # ColQwen2 每批编码页数（本地部署时可按显存/内存调小）
 COLQWEN2_BATCH_SIZE=2
 
+# ColQwen2 设备（auto / cpu / cuda / mps）
+# auto 会优先使用 CUDA；没有 CUDA 时使用 CPU。MPS 因 Qwen2-VL Conv3D 兼容性默认不自动选择。
+COLQWEN2_DEVICE=auto
+
 # ColQwen2 检索候选 patch 数（MaxSim 聚合时的搜索上限）
 COLQWEN2_CANDIDATE_PATCHES=300
 
@@ -420,6 +424,7 @@ pip install -U -r requirements-colqwen2.txt
 EMBED_PROVIDER=colqwen2
 COLQWEN2_MODEL_PATH=./models/colqwen2-v1.0-merged
 COLQWEN2_BATCH_SIZE=2
+COLQWEN2_DEVICE=auto
 COLQWEN2_CANDIDATE_PATCHES=300
 COLQWEN2_COLLECTION_NAME=pdf_rag_colqwen2
 MILVUS_URI=./data/milvus.db
@@ -464,6 +469,7 @@ ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集�
 | `embed_dim` | — | 由 provider 决定 | DashScope: 1152 / Cohere: 1024 / ColQwen2: 128 |
 | `cohere_batch_size` | — | `96` | Cohere 每批编码页数（DashScope 固定 8 张/次） |
 | `colqwen2_batch_size` | `COLQWEN2_BATCH_SIZE` | `2` | ColQwen2 每批编码页数 |
+| `colqwen2_device` | `COLQWEN2_DEVICE` | `auto` | ColQwen2 运行设备：`auto`、`cpu`、`cuda` 或 `mps`。`auto` 不会自动选择 MPS，因为 Qwen2-VL 的 Conv3D 在常见 PyTorch MPS 后端不支持 |
 | `colqwen2_candidate_patches` | `COLQWEN2_CANDIDATE_PATCHES` | `300` | ColQwen2 查询 token 搜索时的候选 patch 数 |
 | `llm_provider` | `LLM_PROVIDER` | `openai_compatible` | LLM 引擎：`openai_compatible`（通用 OpenAI-compatible API）、`openrouter` 或 `dashscope` |
 | `llm_api_key` | `LLM_API_KEY` | — | 通用 OpenAI-compatible API 密钥 |
