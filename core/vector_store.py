@@ -1,10 +1,23 @@
 import logging
 from pathlib import Path
 
+import numpy as np
 from pymilvus import MilvusClient, DataType
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _l2_normalize(vec):
+    arr = np.asarray(vec, dtype=np.float32)
+    norm = np.linalg.norm(arr)
+    if norm == 0:
+        return arr.tolist()
+    return (arr / norm).tolist()
+
+
+def _escape_filter_value(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 class VectorStore:
@@ -59,6 +72,46 @@ class VectorStore:
             self._reconnect()
             return operation()
 
+    def _fetch_colqwen2_page_vectors(self, doc_name: str, page_idx: int) -> list[list[float]]:
+        safe_doc_name = _escape_filter_value(doc_name)
+        rows = self._run_search_with_reconnect(
+            lambda: self.client.query(
+                settings.collection_name,
+                filter=f'doc_name == "{safe_doc_name}" and page_idx == {page_idx}',
+                output_fields=["vector"],
+                limit=16384,
+            )
+        )
+        return [row["vector"] for row in rows]
+
+    def _rerank_colqwen2_pages(
+        self,
+        query_vectors: list[list[float]],
+        candidates: list[dict],
+        top_k: int,
+    ) -> list[dict]:
+        query_arr = np.asarray(query_vectors, dtype=np.float32)
+        reranked = []
+
+        for candidate in candidates:
+            page_vectors = self._fetch_colqwen2_page_vectors(
+                candidate["doc_name"],
+                int(candidate["page_idx"]),
+            )
+            if not page_vectors:
+                continue
+
+            page_arr = np.asarray(page_vectors, dtype=np.float32)
+            scores = query_arr @ page_arr.T
+            reranked.append({
+                "doc_name": candidate["doc_name"],
+                "page_idx": candidate["page_idx"],
+                "score": float(scores.max(axis=1).sum()),
+            })
+
+        reranked.sort(key=lambda item: item["score"], reverse=True)
+        return reranked[:top_k]
+
     def _ensure_collection(self, collection_name: str):
         if self.client.has_collection(collection_name):
             return
@@ -84,7 +137,7 @@ class VectorStore:
                 field_name="vector",
                 index_type="IVF_FLAT",
                 metric_type="IP",
-                params={"nlist": 128},
+                params={"nlist": settings.ivf_nlist},
             )
         else:
             index.add_index(
@@ -118,7 +171,7 @@ class VectorStore:
                 {
                     "doc_name": doc_name,
                     "page_idx": idx,
-                    "vector": vec,
+                    "vector": _l2_normalize(vec),
                 }
                 for idx, vec in enumerate(page_vectors)
             ]
@@ -134,11 +187,11 @@ class VectorStore:
 
         filter_expr = None
         if doc_name:
-            filter_expr = f'doc_name == "{doc_name}"'
+            filter_expr = f'doc_name == "{_escape_filter_value(doc_name)}"'
 
         search_params = {"metric_type": "IP"}
         if settings.index_type == "IVF_FLAT":
-            search_params["params"] = {"nprobe": 10}
+            search_params["params"] = {"nprobe": min(settings.ivf_nprobe, settings.ivf_nlist)}
 
         if settings.embed_provider == "colqwen2":
             page_query_scores: dict[tuple[str, int], dict[int, float]] = {}
@@ -175,8 +228,10 @@ class VectorStore:
                 key=lambda item: item["score"],
                 reverse=True,
             )
-            return ranked[:top_k]
+            candidate_pages = ranked[: max(top_k * 20, 50)]
+            return self._rerank_colqwen2_pages(query_vector, candidate_pages, top_k)
 
+        query_vector = _l2_normalize(query_vector)
         hits = self._run_search_with_reconnect(
             lambda: self.client.search(
                 collection_name,

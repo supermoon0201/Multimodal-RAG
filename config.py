@@ -40,6 +40,8 @@ class Settings:
     dashscope_collection_name: str = "pdf_rag_dashscope"
     colqwen2_collection_name: str = "pdf_rag_colqwen2"
     index_type: str = "IVF_FLAT"
+    ivf_nlist: int = 128
+    ivf_nprobe: int = 64
 
     # Retrieval
     top_k: int = 3
@@ -76,6 +78,8 @@ class Settings:
         self.milvus_uri = os.getenv("MILVUS_URI", os.getenv("MILVUS_HOST", self.milvus_uri))
         self.milvus_token = os.getenv("MILVUS_TOKEN", self.milvus_token)
         self.index_type = os.getenv("INDEX", self.index_type)
+        self.ivf_nlist = int(os.getenv("IVF_NLIST", self.ivf_nlist))
+        self.ivf_nprobe = int(os.getenv("IVF_NPROBE", self.ivf_nprobe))
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", self.openrouter_api_key)
         self.cohere_collection_name = os.getenv("COHERE_COLLECTION_NAME", self.cohere_collection_name)
         self.dashscope_collection_name = os.getenv("DASHSCOPE_COLLECTION_NAME", self.dashscope_collection_name)

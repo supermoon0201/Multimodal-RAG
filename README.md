@@ -388,6 +388,8 @@ DASHSCOPE_COLLECTION_NAME=pdf_rag_dashscope
 
 # 索引类型
 INDEX=IVF_FLAT
+IVF_NLIST=128
+IVF_NPROBE=64
 ```
 
 ### 5. 启动
@@ -494,6 +496,8 @@ ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集�
 | `colqwen2_collection_name` | `COLQWEN2_COLLECTION_NAME` | `pdf_rag_colqwen2` | ColQwen2 本地模型的向量集合名 |
 | `colqwen2_model_path` | `COLQWEN2_MODEL_PATH` | `./models/colqwen2-v1.0-merged` | 本地 ColQwen2 模型目录或 HuggingFace 路径 |
 | `index_type` | `INDEX` | `IVF_FLAT` | 向量索引类型 |
+| `ivf_nlist` | `IVF_NLIST` | `128` | IVF_FLAT 建索引时的分桶数 |
+| `ivf_nprobe` | `IVF_NPROBE` | `64` | IVF_FLAT 搜索时探测的分桶数，越大召回越准但越慢 |
 
 ## 常见问题
 
