@@ -1,11 +1,20 @@
+import logging
 from pathlib import Path
 
 from pymilvus import MilvusClient, DataType
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 
 class VectorStore:
     def __init__(self):
+        self.client_kwargs = self._build_client_kwargs()
+        self.client = self._connect()
+        self._ensure_collection(settings.collection_name)
+
+    @staticmethod
+    def _build_client_kwargs() -> dict:
         uri = settings.milvus_uri
         if "://" not in uri:
             Path(uri).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
@@ -13,9 +22,42 @@ class VectorStore:
         client_kwargs = {"uri": uri}
         if settings.milvus_token:
             client_kwargs["token"] = settings.milvus_token
+        return client_kwargs
 
-        self.client = MilvusClient(**client_kwargs)
-        self._ensure_collection(settings.collection_name)
+    def _connect(self) -> MilvusClient:
+        return MilvusClient(**self.client_kwargs)
+
+    def _reconnect(self):
+        close = getattr(self.client, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                logger.debug("Ignoring Milvus close failure before reconnect", exc_info=True)
+        self.client = self._connect()
+
+    @staticmethod
+    def _is_retryable_error(exc: Exception) -> bool:
+        message = str(exc)
+        return any(
+            marker in message
+            for marker in (
+                "GOAWAY",
+                "UNAVAILABLE",
+                "too_many_pings",
+                "ENHANCE_YOUR_CALM",
+            )
+        )
+
+    def _run_search_with_reconnect(self, operation):
+        try:
+            return operation()
+        except Exception as exc:
+            if not self._is_retryable_error(exc):
+                raise
+            logger.warning("Milvus search connection was closed by gRPC (%s); reconnecting once", exc)
+            self._reconnect()
+            return operation()
 
     def _ensure_collection(self, collection_name: str):
         if self.client.has_collection(collection_name):
@@ -100,15 +142,19 @@ class VectorStore:
 
         if settings.embed_provider == "colqwen2":
             page_query_scores: dict[tuple[str, int], dict[int, float]] = {}
-            for query_idx, qv in enumerate(query_vector):
-                hits = self.client.search(
+
+            hits_per_query = self._run_search_with_reconnect(
+                lambda: self.client.search(
                     collection_name,
-                    data=[qv],
+                    data=query_vector,
                     limit=settings.colqwen2_candidate_patches,
                     output_fields=["doc_name", "page_idx"],
                     search_params=search_params,
                     filter=filter_expr,
-                )[0]
+                )
+            )
+
+            for query_idx, hits in enumerate(hits_per_query):
                 for h in hits:
                     entity = h["entity"]
                     page_key = (entity["doc_name"], int(entity["page_idx"]))
@@ -131,13 +177,15 @@ class VectorStore:
             )
             return ranked[:top_k]
 
-        hits = self.client.search(
-            collection_name,
-            data=[query_vector],
-            limit=top_k,
-            output_fields=["doc_name", "page_idx"],
-            search_params=search_params,
-            filter=filter_expr,
+        hits = self._run_search_with_reconnect(
+            lambda: self.client.search(
+                collection_name,
+                data=[query_vector],
+                limit=top_k,
+                output_fields=["doc_name", "page_idx"],
+                search_params=search_params,
+                filter=filter_expr,
+            )
         )[0]
 
         return [

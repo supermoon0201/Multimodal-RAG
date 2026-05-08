@@ -49,21 +49,31 @@ def _get_page(doc_name: str, page_idx: int):
     return _page_cache[key]
 
 
-def get_components():
+def get_vector_store():
     if "vector_store" not in _components:
         logger.info("Connecting to Milvus: %s", settings.milvus_uri)
         _components["vector_store"] = VectorStore()
+    return _components["vector_store"]
+
+
+def get_embedder():
     if "embedder" not in _components:
         logger.info("Initializing embedder: %s (%s)", settings.embed_model, settings.embed_provider)
         _components["embedder"] = create_embedder()
+    return _components["embedder"]
+
+
+def get_retriever():
     if "retriever" not in _components:
-        _components["retriever"] = Retriever(
-            _components["embedder"], _components["vector_store"]
-        )
+        _components["retriever"] = Retriever(get_embedder(), get_vector_store)
+    return _components["retriever"]
+
+
+def get_generator():
     if "generator" not in _components:
         logger.info("Initializing LLM generator: %s", settings.generation_model)
         _components["generator"] = AnswerGenerator()
-    return _components
+    return _components["generator"]
 
 
 def get_doc_names():
@@ -134,12 +144,11 @@ def encode():
         n_pages = len(images)
         logger.info("Converted %d pages", n_pages)
 
-        comps = get_components()
         logger.info("Encoding %d pages via %s...", n_pages, settings.embed_provider)
-        page_vectors = comps["embedder"].encode_images(images)
+        page_vectors = get_embedder().encode_images(images)
         logger.info("Got %d embeddings", len(page_vectors))
 
-        total_rows = comps["vector_store"].insert_pages(doc_name, page_vectors)
+        total_rows = get_vector_store().insert_pages(doc_name, page_vectors)
         logger.info("Inserted %d rows into Milvus", total_rows)
 
         if settings.embed_provider == "colqwen2":
@@ -171,10 +180,9 @@ def search():
 
     try:
         logger.info("Search: question='%s', doc='%s'", question[:80], doc_name)
-        comps = get_components()
         filter_doc = None if doc_name == "__all__" else doc_name
 
-        results = comps["retriever"].retrieve(
+        results = get_retriever().retrieve(
             question, doc_name=filter_doc, top_k=settings.top_k
         )
         logger.info("Retrieved %d pages", len(results))
@@ -197,7 +205,7 @@ def search():
             return jsonify({"pages": [], "answer": "源 PDF 文件未找到，请重新上传。"})
 
         logger.info("Sending %d images to LLM", len(context_images))
-        answer = comps["generator"].generate(question, context_images)
+        answer = get_generator().generate(question, context_images)
         logger.info("LLM answer: %s", answer[:100])
 
         return jsonify({"pages": gallery, "answer": answer})
@@ -210,9 +218,9 @@ def search():
 def clear():
     # Clear Milvus
     try:
-        comps = get_components()
-        comps["vector_store"].drop_collection()
-        comps["vector_store"]._ensure_collection(settings.collection_name)
+        vector_store = get_vector_store()
+        vector_store.drop_collection()
+        vector_store._ensure_collection(settings.collection_name)
     except Exception:
         pass
 

@@ -67,19 +67,29 @@ def _get_page(doc_name: str, page_idx: int):
     return _page_cache[key]
 
 
-def get_components():
+def get_vector_store():
     if "vector_store" not in _components:
         logger.info("[API] Connecting to Milvus: %s", settings.milvus_uri)
         _components["vector_store"] = VectorStore()
+    return _components["vector_store"]
+
+
+def get_embedder():
     if "embedder" not in _components:
         _components["embedder"] = create_embedder()
+    return _components["embedder"]
+
+
+def get_retriever():
     if "retriever" not in _components:
-        _components["retriever"] = Retriever(
-            _components["embedder"], _components["vector_store"]
-        )
+        _components["retriever"] = Retriever(get_embedder(), get_vector_store)
+    return _components["retriever"]
+
+
+def get_generator():
     if "generator" not in _components:
         _components["generator"] = AnswerGenerator()
-    return _components
+    return _components["generator"]
 
 
 def get_doc_names():
@@ -104,10 +114,9 @@ def query():
 
     try:
         logger.info("[API] 查询: question='%s', doc='%s'", question[:80], doc_name)
-        comps = get_components()
         filter_doc = None if not doc_name else doc_name
 
-        results = comps["retriever"].retrieve(
+        results = get_retriever().retrieve(
             question, doc_name=filter_doc, top_k=settings.top_k
         )
         logger.info("[API] 检索到 %d 页", len(results))
@@ -133,7 +142,7 @@ def query():
             return jsonify({"answer": "源 PDF 文件未找到，请重新上传。", "pages": []})
 
         logger.info("[API] 发送 %d 张图片给 LLM", len(context_images))
-        answer = comps["generator"].generate(question, context_images)
+        answer = get_generator().generate(question, context_images)
         logger.info("[API] 回答: %s", answer[:100])
 
         return jsonify({"answer": answer, "pages": pages})

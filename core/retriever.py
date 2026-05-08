@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 from core.embedder import BaseEmbedder
 from core.vector_store import VectorStore
 from config import settings
@@ -17,7 +18,7 @@ class RetrievalResult:
 
 
 class Retriever:
-    def __init__(self, embedder: BaseEmbedder, vector_store: VectorStore):
+    def __init__(self, embedder: BaseEmbedder, vector_store: VectorStore | Callable[[], VectorStore]):
         self.embedder = embedder
         self.vector_store = vector_store
 
@@ -29,7 +30,8 @@ class Retriever:
 
         query_vector = self.embedder.encode_query(query)
         logger.info("Searching Milvus, top_k=%d, doc_filter=%s", top_k, doc_name)
-        hits = self.vector_store.search(query_vector, top_k=top_k, doc_name=doc_name)
+        vector_store = self.vector_store() if callable(self.vector_store) else self.vector_store
+        hits = vector_store.search(query_vector, top_k=top_k, doc_name=doc_name)
 
         results = [
             RetrievalResult(
