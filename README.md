@@ -334,7 +334,7 @@ pip install -r requirements.txt
 
 ```env
 # Embedding 引擎（dashscope / cohere / colqwen2）
-EMBED_PROVIDER=dashscope
+EMBED_PROVIDER=colqwen2
 
 # DashScope API Key（Embedding + LLM 共用，国内推荐）
 DASHSCOPE_API_KEY=your-dashscope-api-key
@@ -354,8 +354,13 @@ COLQWEN2_CANDIDATE_PATCHES=300
 # ColQwen2 集合名
 COLQWEN2_COLLECTION_NAME=pdf_rag_colqwen2
 
-# LLM 引擎（dashscope 或 openrouter）
-LLM_PROVIDER=dashscope
+# LLM 引擎（openai_compatible / openrouter / dashscope）
+LLM_PROVIDER=openai_compatible
+
+# OpenAI-compatible 第三方 API
+LLM_API_KEY=your-api-key-here
+LLM_BASE_URL=https://your-provider.example.com/v1
+LLM_MODEL=your-model-name
 
 # DashScope 视觉模型（qwen3.5-flash / qwen3.5-plus / qwen3-vl-plus）
 DASHSCOPE_VL_MODEL=qwen3.5-flash
@@ -449,7 +454,7 @@ ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集�
 
 | 参数 | .env 变量 | 默认值 | 说明 |
 |---|---|---|---|
-| `embed_provider` | `EMBED_PROVIDER` | `dashscope` | Embedding 引擎：`dashscope`（国内推荐）、`cohere` 或 `colqwen2` |
+| `embed_provider` | `EMBED_PROVIDER` | `colqwen2` | Embedding 引擎：`dashscope`、`cohere` 或 `colqwen2` |
 | `dashscope_api_key` | `DASHSCOPE_API_KEY` | — | DashScope API 密钥（Embedding + LLM 共用） |
 | `cohere_api_key` | `COHERE_API_KEY` | — | Cohere API 密钥（使用 Cohere 时必需） |
 | `embed_model` | — | 由 provider 决定 | DashScope: `tongyi-embedding-vision-plus` / Cohere: `embed-v4.0` / ColQwen2: 本地模型路径 |
@@ -457,7 +462,10 @@ ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集�
 | `cohere_batch_size` | — | `96` | Cohere 每批编码页数（DashScope 固定 8 张/次） |
 | `colqwen2_batch_size` | `COLQWEN2_BATCH_SIZE` | `2` | ColQwen2 每批编码页数 |
 | `colqwen2_candidate_patches` | `COLQWEN2_CANDIDATE_PATCHES` | `300` | ColQwen2 查询 token 搜索时的候选 patch 数 |
-| `llm_provider` | `LLM_PROVIDER` | `dashscope` | LLM 引擎：`dashscope`（国内推荐）或 `openrouter` |
+| `llm_provider` | `LLM_PROVIDER` | `openai_compatible` | LLM 引擎：`openai_compatible`（通用 OpenAI-compatible API）、`openrouter` 或 `dashscope` |
+| `llm_api_key` | `LLM_API_KEY` | — | 通用 OpenAI-compatible API 密钥 |
+| `llm_base_url` | `LLM_BASE_URL` | — | 通用 OpenAI-compatible API Base URL |
+| `llm_model` | `LLM_MODEL` | — | 通用 OpenAI-compatible API 模型名 |
 | `dashscope_vl_model` | `DASHSCOPE_VL_MODEL` | `qwen3.5-flash` | DashScope 视觉模型（`qwen3.5-flash` / `qwen3.5-plus` / `qwen3-vl-plus`） |
 | `openrouter_api_key` | `OPENROUTER_API_KEY` | — | OpenRouter API 密钥（使用 OpenRouter 时必需） |
 | `generation_model` | — | 由 provider 决定 | DashScope: `qwen3.5-flash` / OpenRouter: `qwen/qwen3.5-397b-a17b` |

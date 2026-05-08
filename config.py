@@ -8,7 +8,7 @@ load_dotenv()
 @dataclass
 class Settings:
     # Embedding provider: "cohere", "dashscope", or "colqwen2"
-    embed_provider: str = "dashscope"
+    embed_provider: str = "colqwen2"
 
     # Cohere
     cohere_api_key: str = ""
@@ -44,7 +44,10 @@ class Settings:
     top_k: int = 3
 
     # LLM
-    llm_provider: str = "dashscope"  # "openrouter" or "dashscope"
+    llm_provider: str = "openai_compatible"  # "openai_compatible", "openrouter", or "dashscope"
+    llm_api_key: str = ""
+    llm_base_url: str = ""
+    llm_model: str = ""
     openrouter_api_key: str = ""
     openrouter_model: str = "qwen/qwen3.5-397b-a17b"
     dashscope_vl_model: str = "qwen3.5-flash"
@@ -75,6 +78,9 @@ class Settings:
         self.dashscope_collection_name = os.getenv("DASHSCOPE_COLLECTION_NAME", self.dashscope_collection_name)
         self.colqwen2_collection_name = os.getenv("COLQWEN2_COLLECTION_NAME", self.colqwen2_collection_name)
         self.llm_provider = os.getenv("LLM_PROVIDER", self.llm_provider).lower()
+        self.llm_api_key = os.getenv("LLM_API_KEY", self.llm_api_key)
+        self.llm_base_url = os.getenv("LLM_BASE_URL", self.llm_base_url)
+        self.llm_model = os.getenv("LLM_MODEL", self.llm_model)
         self.dashscope_vl_model = os.getenv("DASHSCOPE_VL_MODEL", self.dashscope_vl_model)
 
     def _resolve_provider(self):
@@ -90,7 +96,9 @@ class Settings:
             self.embed_model = self.dashscope_model
             self.embed_dim = self.dashscope_dim
             self.collection_name = self.dashscope_collection_name
-        if self.llm_provider == "openrouter":
+        if self.llm_provider == "openai_compatible":
+            self.generation_model = self.llm_model
+        elif self.llm_provider == "openrouter":
             self.generation_model = self.openrouter_model
         else:
             self.generation_model = self.dashscope_vl_model

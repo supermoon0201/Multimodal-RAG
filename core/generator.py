@@ -16,7 +16,13 @@ _SYSTEM_PROMPT = (
 
 class AnswerGenerator:
     def __init__(self):
-        if settings.llm_provider == "openrouter":
+        if settings.llm_provider == "openai_compatible":
+            self.client = OpenAI(
+                api_key=settings.llm_api_key,
+                base_url=settings.llm_base_url,
+                timeout=120.0,
+            )
+        elif settings.llm_provider == "openrouter":
             self.client = OpenAI(
                 api_key=settings.openrouter_api_key,
                 base_url="https://openrouter.ai/api/v1",
