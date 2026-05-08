@@ -42,7 +42,7 @@ class Settings:
     index_type: str = "IVF_FLAT"
 
     # Retrieval
-    top_k: int = 2
+    top_k: int = 3
 
     # LLM
     llm_provider: str = "openai_compatible"  # "openai_compatible", "openrouter", or "dashscope"

@@ -190,7 +190,7 @@ def search():
         if not results:
             return jsonify({"pages": [], "answer": "未找到相关页面。"})
 
-        expanded = expand_pages(results, UPLOAD_DIR, window=1)
+        expanded = expand_pages(results, UPLOAD_DIR, window=2)
 
         gallery = []
         context_images = []
