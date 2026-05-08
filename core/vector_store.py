@@ -99,33 +99,32 @@ class VectorStore:
             search_params["params"] = {"nprobe": 10}
 
         if settings.embed_provider == "colqwen2":
-            page_patch_scores: dict[tuple[str, int], dict[int, float]] = {}
-            for qv in query_vector:
+            page_query_scores: dict[tuple[str, int], dict[int, float]] = {}
+            for query_idx, qv in enumerate(query_vector):
                 hits = self.client.search(
                     collection_name,
                     data=[qv],
                     limit=settings.colqwen2_candidate_patches,
-                    output_fields=["doc_name", "page_idx", "patch_idx"],
+                    output_fields=["doc_name", "page_idx"],
                     search_params=search_params,
                     filter=filter_expr,
                 )[0]
                 for h in hits:
                     entity = h["entity"]
                     page_key = (entity["doc_name"], int(entity["page_idx"]))
-                    patch_idx = int(entity["patch_idx"])
                     score = float(h["distance"])
-                    patch_scores = page_patch_scores.setdefault(page_key, {})
-                    if score > patch_scores.get(patch_idx, float("-inf")):
-                        patch_scores[patch_idx] = score
+                    query_scores = page_query_scores.setdefault(page_key, {})
+                    if score > query_scores.get(query_idx, float("-inf")):
+                        query_scores[query_idx] = score
 
             ranked = sorted(
                 (
                     {
                         "doc_name": doc_name_e,
                         "page_idx": page_idx,
-                        "score": sum(patch_scores.values()),
+                        "score": sum(query_scores.values()),
                     }
-                    for (doc_name_e, page_idx), patch_scores in page_patch_scores.items()
+                    for (doc_name_e, page_idx), query_scores in page_query_scores.items()
                 ),
                 key=lambda item: item["score"],
                 reverse=True,
