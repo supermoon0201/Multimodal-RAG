@@ -339,6 +339,9 @@ EMBED_PROVIDER=colqwen2
 # DashScope API Key（Embedding + LLM 共用，国内推荐）
 DASHSCOPE_API_KEY=your-dashscope-api-key
 
+# DashScope Embedding 模型（使用 DashScope Embedding 时生效）
+DASHSCOPE_MODEL=tongyi-embedding-vision-plus
+
 # Cohere API Key（使用 Cohere Embedding 时必需）
 COHERE_API_KEY=your-cohere-api-key
 
@@ -464,6 +467,7 @@ ColQwen2 使用多向量 patch 检索，和 DashScope / Cohere 的单向量集�
 |---|---|---|---|
 | `embed_provider` | `EMBED_PROVIDER` | `colqwen2` | Embedding 引擎：`dashscope`、`cohere` 或 `colqwen2` |
 | `dashscope_api_key` | `DASHSCOPE_API_KEY` | — | DashScope API 密钥（Embedding + LLM 共用） |
+| `dashscope_model` | `DASHSCOPE_MODEL` | `tongyi-embedding-vision-plus` | DashScope Embedding 模型 |
 | `cohere_api_key` | `COHERE_API_KEY` | — | Cohere API 密钥（使用 Cohere 时必需） |
 | `embed_model` | — | 由 provider 决定 | DashScope: `tongyi-embedding-vision-plus` / Cohere: `embed-v4.0` / ColQwen2: 本地模型路径 |
 | `embed_dim` | — | 由 provider 决定 | DashScope: 1152 / Cohere: 1024 / ColQwen2: 128 |

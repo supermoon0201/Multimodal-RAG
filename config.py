@@ -68,6 +68,7 @@ class Settings:
         self.embed_provider = os.getenv("EMBED_PROVIDER", self.embed_provider).lower()
         self.cohere_api_key = os.getenv("COHERE_API_KEY", self.cohere_api_key)
         self.dashscope_api_key = os.getenv("DASHSCOPE_API_KEY", self.dashscope_api_key)
+        self.dashscope_model = os.getenv("DASHSCOPE_MODEL", self.dashscope_model)
         self.colqwen2_model_path = os.getenv("COLQWEN2_MODEL_PATH", self.colqwen2_model_path)
         self.colqwen2_batch_size = int(os.getenv("COLQWEN2_BATCH_SIZE", self.colqwen2_batch_size))
         self.colqwen2_candidate_patches = int(os.getenv("COLQWEN2_CANDIDATE_PATCHES", self.colqwen2_candidate_patches))
