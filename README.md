@@ -314,7 +314,7 @@ Flask 接收文件，保存到 data/uploads/{filename}.pdf
 pip install -r requirements.txt
 ```
 
-基础模式依赖包括 cohere、dashscope、`pymilvus[milvus_lite]`、openai、PyMuPDF、pillow、flask、numpy、python-dotenv 和 setuptools；其中 Milvus Lite 用于默认的本地文件数据库 `./data/milvus.db`。若启用本地 ColQwen2，再额外安装 `torch` 和 `colpali-engine`。
+基础模式依赖包括 cohere、dashscope、`pymilvus[milvus_lite]`、openai、PyMuPDF、pillow、flask、numpy、python-dotenv 和 `setuptools<82`；其中 Milvus Lite 用于默认的本地文件数据库 `./data/milvus.db`。若启用本地 ColQwen2，再额外安装 `torch` 和 `colpali-engine`。
 
 ### 3. 获取 API Key
 
@@ -529,12 +529,12 @@ pip install torch colpali-engine
 
 ### Q: Milvus 连接失败
 
-检查 `.env` 中的 `MILVUS_URI`。如果使用本地 Milvus Lite，确认已通过 `pip install -r requirements.txt` 安装 `pymilvus[milvus_lite]` 和 `setuptools`，并确认 `./data/` 目录可写；如果连接本地/自建 Milvus Server，确认服务已启动且地址正确。
+检查 `.env` 中的 `MILVUS_URI`。如果使用本地 Milvus Lite，确认已通过 `pip install -r requirements.txt` 安装 `pymilvus[milvus_lite]` 和 `setuptools<82`，并确认 `./data/` 目录可写；如果连接本地/自建 Milvus Server，确认服务已启动且地址正确。
 
-如果报错包含 `No module named 'pkg_resources'`，说明当前 Python 环境缺少 setuptools，执行：
+如果报错包含 `No module named 'pkg_resources'`，说明当前 Python 环境的 setuptools 版本不兼容。`milvus-lite 2.5.1` 仍依赖 `pkg_resources`，而 setuptools 82 起不再包含它。执行：
 
 ```bash
-pip install -U setuptools
+pip install "setuptools<82"
 ```
 
 ### Q: Milvus 报错 `Insert missed a field`

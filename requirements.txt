@@ -1,7 +1,7 @@
 cohere>=5.0.0
 dashscope>=1.14.0
 pymilvus[milvus_lite]>=2.4.0
-setuptools>=69.0.0
+setuptools>=69.0.0,<82.0.0
 openai>=1.0.0
 PyMuPDF>=1.24.0
 pillow>=10.0.0
